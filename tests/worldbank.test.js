@@ -4,6 +4,7 @@ import {
   formatIndicatorValue,
   getCommonGroundScore,
   getCountries,
+  getCountryIndicatorSeries,
   getCountryIndicators,
   getMostSimilar,
   INDICATORS
@@ -46,6 +47,11 @@ describe('worldbank helpers', () => {
     expect(score).toBe(90);
   });
 
+  it('returns zero score when no valid indicators exist', () => {
+    const score = getCommonGroundScore([{ closeness: null }, { closeness: null }]);
+    expect(score).toBe(0);
+  });
+
   it('handles zero baseline comparisons', () => {
     const result = compareIndicators(
       [{ key: 'x', label: 'Zero A', value: 0, year: '2022' }],
@@ -53,6 +59,15 @@ describe('worldbank helpers', () => {
     );
     expect(result[0].closeness).toBe(100);
     expect(result[0].withinMargin).toBe(true);
+  });
+
+  it('handles missing matching indicator between countries', () => {
+    const result = compareIndicators(
+      [{ key: 'lifeExpectancy', label: 'Life', value: 75, year: '2020' }],
+      [{ key: 'internet', label: 'Internet', value: 85, year: '2020' }]
+    );
+    expect(result[0].valueB).toBeNull();
+    expect(result[0].closeness).toBeNull();
   });
 
   it('returns best matching indicators', () => {
@@ -70,6 +85,8 @@ describe('worldbank helpers', () => {
   it('formats indicator values and fallbacks', () => {
     expect(formatIndicatorValue(1234.56, 'USD')).toBe('$1,234.6');
     expect(formatIndicatorValue(12.345, '%')).toBe('12.3 %');
+    expect(formatIndicatorValue(4.321, '%')).toBe('4.32 %');
+    expect(formatIndicatorValue(undefined, '%')).toBe('No recent data');
     expect(formatIndicatorValue(null, '%')).toBe('No recent data');
   });
 });
@@ -127,6 +144,48 @@ describe('worldbank api integration', () => {
     expect(data).toHaveLength(INDICATORS.length);
     expect(data[0].value).toBe(42.2);
     expect(data[0].year).toBe('2020');
+  });
+
+  it('handles indicator responses with no usable rows', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue(/** @type {any} */ ({
+      ok: true,
+      json: async () => [{ page: 1 }, null]
+    }));
+
+    const data = await getCountryIndicators('DE');
+    expect(data).toHaveLength(INDICATORS.length);
+    expect(data[0].value).toBeNull();
+    expect(data[0].year).toBeNull();
+  });
+
+  it('fetches historical indicator series and sorts ascending', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue(/** @type {any} */ ({
+      ok: true,
+      json: async () => [
+        { page: 1 },
+        [
+          { date: '2002', value: 30 },
+          { date: '2001', value: null },
+          { date: '2000', value: 10 }
+        ]
+      ]
+    }));
+
+    const series = await getCountryIndicatorSeries('DE', 'SP.POP.TOTL', 2000);
+    expect(series).toEqual([
+      { year: 2000, value: 10 },
+      { year: 2002, value: 30 }
+    ]);
+  });
+
+  it('returns empty series when rows are missing', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue(/** @type {any} */ ({
+      ok: true,
+      json: async () => [{ page: 1 }, null]
+    }));
+
+    const series = await getCountryIndicatorSeries('DE', 'SP.POP.TOTL', 2000);
+    expect(series).toEqual([]);
   });
 
   it('throws on non-ok responses', async () => {
