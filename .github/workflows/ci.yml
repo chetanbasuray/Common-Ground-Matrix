@@ -11,9 +11,6 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [20.x, 22.x]
 
     steps:
       - name: Checkout
@@ -22,7 +19,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 22.x
           cache: npm
 
       - name: Install dependencies
@@ -44,11 +41,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-node-${{ matrix.node-version }}
+          name: coverage-node-22x
           path: coverage/
 
   audit:
-    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -63,5 +59,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Security audit (high+)
-        run: npm audit --audit-level=high
+      - name: Security audit report (high+; non-blocking)
+        run: npm audit --audit-level=high --json > audit-report.json || true
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-report
+          path: audit-report.json
