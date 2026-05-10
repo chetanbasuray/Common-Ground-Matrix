@@ -57,40 +57,6 @@ function formatGapLabel(deltaPercent, direction) {
   return `${deltaPercent.toFixed(1)}% ${direction}`;
 }
 
-function buildPopulationProjection(series, fertilityLatest, horizonYear = 2100) {
-  if (!series.length) {
-    return {
-      scenarios: { baseline: [], fertilityAdjusted: [], stability: [] },
-      latest: null
-    };
-  }
-
-  const latest = series[series.length - 1];
-  const recent = series.slice(-11);
-  const start = recent[0];
-  const years = Math.max(1, latest.year - start.year);
-  const growthRate = start.value > 0 ? Math.pow(latest.value / start.value, 1 / years) - 1 : 0;
-
-  const fertilityFactor = fertilityLatest && fertilityLatest > 0 ? Math.min(1.15, Math.max(0.45, fertilityLatest / 2.1)) : 1;
-  const adjustedGrowthRate = growthRate * fertilityFactor;
-
-  const baseline = [];
-  const fertilityAdjusted = [];
-  const stability = [];
-  for (let year = latest.year + 1; year <= horizonYear; year += 1) {
-    baseline.push({ year, value: latest.value * Math.pow(1 + growthRate, year - latest.year) });
-    fertilityAdjusted.push({ year, value: latest.value * Math.pow(1 + adjustedGrowthRate, year - latest.year) });
-    stability.push({ year, value: latest.value });
-  }
-
-  return {
-    scenarios: { baseline, fertilityAdjusted, stability },
-    latest,
-    growthRate,
-    adjustedGrowthRate
-  };
-}
-
 function mergeSeriesByYear(leftSeries, rightSeries, keyA, keyB) {
   const byYear = new Map();
   leftSeries.forEach((item) => {
@@ -113,6 +79,25 @@ function buildSimilarityTimeline(leftSeries, rightSeries) {
       const closeness = Math.max(0, (1 - Math.abs(item.left - item.right) / max) * 100);
       return { year: item.year, closeness: Number(closeness.toFixed(1)) };
     });
+}
+
+function getCountryLeads(validComparisons, leftName, rightName) {
+  const leads = validComparisons.map((item) => {
+    const max = Math.max(Math.abs(item.valueA), Math.abs(item.valueB), 1);
+    const deltaPct = (Math.abs(item.valueA - item.valueB) / max) * 100;
+    const winner = item.valueA > item.valueB ? leftName : rightName;
+    return {
+      key: item.key,
+      label: item.label,
+      winner,
+      deltaPct: Number(deltaPct.toFixed(1))
+    };
+  });
+
+  return {
+    left: leads.filter((l) => l.winner === leftName).sort((a, b) => b.deltaPct - a.deltaPct),
+    right: leads.filter((l) => l.winner === rightName).sort((a, b) => b.deltaPct - a.deltaPct)
+  };
 }
 
 function MirrorRow({ item, leftName, rightName, leftFlag, rightFlag }) {
@@ -275,8 +260,6 @@ export default async function Home({ searchParams }) {
     populationSeriesB,
     populationGrowthSeriesA,
     populationGrowthSeriesB,
-    fertilitySeriesA,
-    fertilitySeriesB,
     internetSeriesA,
     internetSeriesB,
     lifeSeriesA,
@@ -286,8 +269,6 @@ export default async function Home({ searchParams }) {
     getCountryIndicatorSeries(countryB, 'SP.POP.TOTL', 1990),
     getCountryIndicatorSeries(countryA, 'SP.POP.GROW', 1990),
     getCountryIndicatorSeries(countryB, 'SP.POP.GROW', 1990),
-    getCountryIndicatorSeries(countryA, 'SP.DYN.TFRT.IN', 1990),
-    getCountryIndicatorSeries(countryB, 'SP.DYN.TFRT.IN', 1990),
     getCountryIndicatorSeries(countryA, 'IT.NET.USER.ZS', 1990),
     getCountryIndicatorSeries(countryB, 'IT.NET.USER.ZS', 1990),
     getCountryIndicatorSeries(countryA, 'SP.DYN.LE00.IN', 1990),
@@ -301,28 +282,25 @@ export default async function Home({ searchParams }) {
     .sort((a, b) => b.closeness - a.closeness);
   const commonGroundScore = getCommonGroundScore(comparisons);
   const topMatches = getMostSimilar(matchedComparisons);
-  const fertilityLatestA = fertilitySeriesA[fertilitySeriesA.length - 1]?.value ?? null;
-  const fertilityLatestB = fertilitySeriesB[fertilitySeriesB.length - 1]?.value ?? null;
-  const popProjectionA = buildPopulationProjection(populationSeriesA, fertilityLatestA, 2100);
-  const popProjectionB = buildPopulationProjection(populationSeriesB, fertilityLatestB, 2100);
+  const latestPopulationA = populationSeriesA[populationSeriesA.length - 1] || null;
+  const latestPopulationB = populationSeriesB[populationSeriesB.length - 1] || null;
   const internetSimilarity = buildSimilarityTimeline(internetSeriesA, internetSeriesB);
   const lifeSimilarity = buildSimilarityTimeline(lifeSeriesA, lifeSeriesB);
   const trendSeries = {
-      population: {
-        history: mergeSeriesByYear(populationSeriesA, populationSeriesB, 'left', 'right'),
-        projectionA: popProjectionA.scenarios,
-        projectionB: popProjectionB.scenarios,
-        latestA: popProjectionA.latest,
-        latestB: popProjectionB.latest
-      },
-      internet: mergeSeriesByYear(internetSeriesA, internetSeriesB, 'left', 'right'),
-      lifeExpectancy: mergeSeriesByYear(lifeSeriesA, lifeSeriesB, 'left', 'right'),
-      populationGrowth: mergeSeriesByYear(populationGrowthSeriesA, populationGrowthSeriesB, 'left', 'right'),
-      similarity: {
-        internet: internetSimilarity,
-        lifeExpectancy: lifeSimilarity
+    population: {
+      history: mergeSeriesByYear(populationSeriesA, populationSeriesB, 'left', 'right'),
+      latestA: latestPopulationA,
+      latestB: latestPopulationB
+    },
+    internet: mergeSeriesByYear(internetSeriesA, internetSeriesB, 'left', 'right'),
+    lifeExpectancy: mergeSeriesByYear(lifeSeriesA, lifeSeriesB, 'left', 'right'),
+    populationGrowth: mergeSeriesByYear(populationGrowthSeriesA, populationGrowthSeriesB, 'left', 'right'),
+    similarity: {
+      internet: internetSimilarity,
+      lifeExpectancy: lifeSimilarity
     }
   };
+  const leads = getCountryLeads(validComparisons, countryAName, countryBName);
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 md:px-8">
@@ -381,7 +359,7 @@ export default async function Home({ searchParams }) {
           </h2>
           <p className="mt-2 text-sm text-slate-600">Average statistical closeness across available datasets.</p>
           <p className="mt-2 text-xs text-slate-500">
-            Population now: {formatIndicatorValue(popProjectionA.latest?.value ?? null, 'people')} vs {formatIndicatorValue(popProjectionB.latest?.value ?? null, 'people')}
+            Population now: {formatIndicatorValue(latestPopulationA?.value ?? null, 'people')} vs {formatIndicatorValue(latestPopulationB?.value ?? null, 'people')}
           </p>
         </article>
 
@@ -412,6 +390,31 @@ export default async function Home({ searchParams }) {
           leftFlag={countryAFlag}
           rightFlag={countryBFlag}
         />
+      </section>
+
+      <section className="mt-8 grid gap-4 md:grid-cols-2">
+        <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+          <h3 className="font-semibold text-slate-800">{countryAFlag} {countryAName} is doing better in</h3>
+          <ul className="mt-3 space-y-2 text-sm text-slate-700">
+            {leads.left.length ? leads.left.slice(0, 6).map((item) => (
+              <li key={item.key} className="flex items-center justify-between">
+                <span>{item.label}</span>
+                <span className="font-semibold">{item.deltaPct}% lead</span>
+              </li>
+            )) : <li className="text-slate-500">No lead areas in current dataset</li>}
+          </ul>
+        </article>
+        <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+          <h3 className="font-semibold text-slate-800">{countryBFlag} {countryBName} is doing better in</h3>
+          <ul className="mt-3 space-y-2 text-sm text-slate-700">
+            {leads.right.length ? leads.right.slice(0, 6).map((item) => (
+              <li key={item.key} className="flex items-center justify-between">
+                <span>{item.label}</span>
+                <span className="font-semibold">{item.deltaPct}% lead</span>
+              </li>
+            )) : <li className="text-slate-500">No lead areas in current dataset</li>}
+          </ul>
+        </article>
       </section>
 
       {validComparisons.length > 0 ? (

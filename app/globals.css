@@ -25,3 +25,54 @@ button {
 button {
   transition: all 150ms ease;
 }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+  }
+
+  body {
+    background-image:
+      radial-gradient(circle at 14% 10%, #20231d 0%, transparent 34%),
+      radial-gradient(circle at 82% 8%, #1a1d18 0%, transparent 30%),
+      linear-gradient(165deg, #141710 0%, #1a1e16 100%);
+    color: #e8eadf;
+  }
+
+  .bg-white\/80,
+  .bg-white\/75 {
+    background-color: rgba(35, 37, 29, 0.88);
+  }
+
+  .bg-sky\/50 {
+    background-color: rgba(44, 132, 224, 0.18);
+  }
+
+  .border-slate-200,
+  .border-slate-200\/70,
+  .border-slate-200\/80 {
+    border-color: rgba(191, 193, 183, 0.35);
+  }
+
+  .text-slate-900,
+  .text-slate-800,
+  .text-slate-700 {
+    color: #f3f4ed;
+  }
+
+  .text-slate-600,
+  .text-slate-500 {
+    color: #c3c6b8;
+  }
+
+  .bg-slate-100,
+  .bg-slate-200 {
+    background-color: rgba(156, 160, 145, 0.18);
+  }
+
+  select {
+    background-color: #1d2018;
+    border-color: rgba(191, 193, 183, 0.45);
+    color: #f3f4ed;
+  }
+}
