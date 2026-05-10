@@ -22,15 +22,15 @@ import {
 } from 'recharts';
 
 const COLORS = {
-  left: '#1d4ed8',
-  right: '#7c3aed',
-  high: '#16a34a',
-  mid: '#f59e0b',
-  low: '#ef4444',
-  elitePie: '#0f766e',
-  strongPie: '#06b6d4',
-  fairPie: '#f59e0b',
-  weakPie: '#f43f5e'
+  left: '#2c84e0',
+  right: '#7c44a6',
+  high: '#2c8c66',
+  mid: '#f7a501',
+  low: '#cd4239',
+  elitePie: '#2c8c66',
+  strongPie: '#2c84e0',
+  fairPie: '#f7a501',
+  weakPie: '#cd4239'
 };
 
 export default function ComparisonCharts({

@@ -8,10 +8,23 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        mist: '#f5f7f5',
-        pine: '#355145',
-        clay: '#d8cab6',
-        sky: '#dbe9f1'
+        canvas: '#eeefe9',
+        card: '#ffffff',
+        ink: '#23251d',
+        body: '#4d4f46',
+        hairline: '#bfc1b7',
+        soft: '#e5e7e0',
+        primary: '#f7a501',
+        'primary-pressed': '#dd9001',
+        linkblue: '#1d4ed8',
+        teal: '#1078a3',
+        redsoft: '#f7d6d3',
+        greensoft: '#d9eddf',
+        purplesoft: '#e7d8ee',
+        mist: '#eeefe9',
+        pine: '#23251d',
+        clay: '#e5e7e0',
+        sky: '#dceaf6'
       }
     }
   },

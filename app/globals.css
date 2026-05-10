@@ -7,10 +7,21 @@
 }
 
 body {
-  @apply bg-mist text-slate-800;
+  @apply bg-canvas text-body;
   background-image:
-    radial-gradient(circle at 20% 15%, #dbe9f1 0%, transparent 40%),
-    radial-gradient(circle at 80% 10%, #e6ddd1 0%, transparent 35%),
-    linear-gradient(160deg, #f5f7f5 0%, #edf2ee 100%);
+    radial-gradient(circle at 12% 10%, #f8f8f4 0%, transparent 34%),
+    radial-gradient(circle at 82% 10%, #e5e7e0 0%, transparent 30%),
+    linear-gradient(165deg, #eeefe9 0%, #e6e8df 100%);
   min-height: 100vh;
+  font-feature-settings: 'kern' 1;
+  font-family: 'IBM Plex Sans', 'Avenir Next', 'Segoe UI', sans-serif;
+}
+
+select,
+button {
+  border-radius: 6px;
+}
+
+button {
+  transition: all 150ms ease;
 }
