@@ -42,7 +42,21 @@ function getSimilarityBuckets(validComparisons) {
   };
 }
 
-function MirrorRow({ item, leftName, rightName }) {
+function isoToFlag(isoCode) {
+  if (!isoCode || isoCode.length !== 2) return '';
+  return isoCode
+    .toUpperCase()
+    .split('')
+    .map((char) => String.fromCodePoint(127397 + char.charCodeAt(0)))
+    .join('');
+}
+
+function formatGapLabel(deltaPercent, leftName, rightName) {
+  if (deltaPercent < 1) return `Very similar (${leftName} and ${rightName})`;
+  return `${deltaPercent.toFixed(1)}% gap`;
+}
+
+function MirrorRow({ item, leftName, rightName, leftFlag, rightFlag }) {
   const widths = getValueWidths(item.valueA, item.valueB);
 
   return (
@@ -55,12 +69,12 @@ function MirrorRow({ item, leftName, rightName }) {
       </div>
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
         <div className="text-right">
-          <p className="text-xs uppercase tracking-wide text-slate-500">{leftName}</p>
+          <p className="text-xs uppercase tracking-wide text-slate-500">{leftFlag} {leftName}</p>
           <p className="font-medium text-slate-800">{formatIndicatorValue(item.valueA, item.unit)}</p>
         </div>
         <ArrowLeftRight size={16} className="text-pine" />
         <div>
-          <p className="text-xs uppercase tracking-wide text-slate-500">{rightName}</p>
+          <p className="text-xs uppercase tracking-wide text-slate-500">{rightFlag} {rightName}</p>
           <p className="font-medium text-slate-800">{formatIndicatorValue(item.valueB, item.unit)}</p>
         </div>
       </div>
@@ -122,7 +136,7 @@ function DivergenceChart({ items, leftName, rightName }) {
               <div className="mb-1 flex items-center justify-between text-xs">
                 <span className="text-slate-700">{item.label}</span>
                 <span className="font-semibold text-slate-800">
-                  {rightLead ? rightName : leftName} +{width.toFixed(1)}%
+                  {rightLead ? rightName : leftName} {formatGapLabel(width, leftName, rightName)}
                 </span>
               </div>
               <div className="relative h-3 rounded-full bg-slate-200">
@@ -180,6 +194,8 @@ export default async function Home({ searchParams }) {
 
   const countryAName = countries.find((c) => c.id === countryA)?.name || countryA;
   const countryBName = countries.find((c) => c.id === countryB)?.name || countryB;
+  const countryAFlag = isoToFlag(countryA);
+  const countryBFlag = isoToFlag(countryB);
 
   const [aData, bData] = await Promise.all([
     getCountryIndicators(countryA),
@@ -239,7 +255,7 @@ export default async function Home({ searchParams }) {
       <section className="mt-8 grid gap-6 md:grid-cols-3">
         <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
           <p className="text-sm text-slate-500">Comparison Hub</p>
-          <h2 className="mt-1 text-xl font-semibold text-slate-900">{countryAName} {'<>'} {countryBName}</h2>
+          <h2 className="mt-1 text-xl font-semibold text-slate-900">{countryAFlag} {countryAName} {'<>'} {countryBFlag} {countryBName}</h2>
           <p className="mt-2 text-sm text-slate-600">Mirrored profile based on 10 key indicators.</p>
         </article>
 
@@ -279,6 +295,8 @@ export default async function Home({ searchParams }) {
         <ComparisonCharts
           leftName={countryAName}
           rightName={countryBName}
+          leftFlag={countryAFlag}
+          rightFlag={countryBFlag}
           validComparisons={validComparisons}
           matchedComparisons={matchedComparisons}
         />
@@ -287,7 +305,14 @@ export default async function Home({ searchParams }) {
       <section className="mt-8 space-y-4">
         {matchedComparisons.length ? (
           matchedComparisons.map((item) => (
-            <MirrorRow key={item.key} item={item} leftName={countryAName} rightName={countryBName} />
+            <MirrorRow
+              key={item.key}
+              item={item}
+              leftName={countryAName}
+              rightName={countryBName}
+              leftFlag={countryAFlag}
+              rightFlag={countryBFlag}
+            />
           ))
         ) : (
           <div className="rounded-2xl border border-slate-200 bg-white/80 p-6 text-center text-slate-600 shadow-sm">

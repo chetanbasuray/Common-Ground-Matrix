@@ -6,6 +6,8 @@ import {
   CartesianGrid,
   Cell,
   Legend,
+  Pie,
+  PieChart,
   Radar,
   RadarChart,
   PolarAngleAxis,
@@ -18,14 +20,18 @@ import {
 } from 'recharts';
 
 const COLORS = {
-  left: '#355145',
-  right: '#6b8f7a',
-  high: '#2f855a',
-  mid: '#d69e2e',
-  low: '#c53030'
+  left: '#1d4ed8',
+  right: '#7c3aed',
+  high: '#16a34a',
+  mid: '#f59e0b',
+  low: '#ef4444',
+  elitePie: '#0f766e',
+  strongPie: '#06b6d4',
+  fairPie: '#f59e0b',
+  weakPie: '#f43f5e'
 };
 
-export default function ComparisonCharts({ leftName, rightName, validComparisons, matchedComparisons }) {
+export default function ComparisonCharts({ leftName, rightName, leftFlag, rightFlag, validComparisons, matchedComparisons }) {
   const radarData = validComparisons.slice(0, 8).map((item) => {
     const max = Math.max(Math.abs(item.valueA), Math.abs(item.valueB), 1);
     return {
@@ -47,6 +53,13 @@ export default function ComparisonCharts({ leftName, rightName, validComparisons
     [rightName]: Number(item.valueB.toFixed(2))
   }));
 
+  const bucketData = [
+    { name: '90-100%', value: validComparisons.filter((i) => i.closeness >= 90).length, fill: COLORS.elitePie },
+    { name: '80-89%', value: validComparisons.filter((i) => i.closeness >= 80 && i.closeness < 90).length, fill: COLORS.strongPie },
+    { name: '75-79%', value: validComparisons.filter((i) => i.closeness >= 75 && i.closeness < 80).length, fill: COLORS.fairPie },
+    { name: '<75%', value: validComparisons.filter((i) => i.closeness < 75).length, fill: COLORS.weakPie }
+  ];
+
   return (
     <section className="mt-8 grid gap-4 lg:grid-cols-2">
       <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
@@ -58,8 +71,8 @@ export default function ComparisonCharts({ leftName, rightName, validComparisons
               <PolarGrid stroke="#cbd5e1" />
               <PolarAngleAxis dataKey="indicator" tick={{ fontSize: 10 }} />
               <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
-              <Radar name={leftName} dataKey={leftName} stroke={COLORS.left} fill={COLORS.left} fillOpacity={0.28} />
-              <Radar name={rightName} dataKey={rightName} stroke={COLORS.right} fill={COLORS.right} fillOpacity={0.28} />
+              <Radar name={`${leftFlag} ${leftName}`} dataKey={leftName} stroke={COLORS.left} fill={COLORS.left} fillOpacity={0.28} />
+              <Radar name={`${rightFlag} ${rightName}`} dataKey={rightName} stroke={COLORS.right} fill={COLORS.right} fillOpacity={0.28} />
               <Legend />
               <Tooltip />
             </RadarChart>
@@ -87,6 +100,24 @@ export default function ComparisonCharts({ leftName, rightName, validComparisons
         </div>
       </article>
 
+      <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+        <h3 className="mb-2 font-semibold text-slate-800">Similarity Mix</h3>
+        <p className="mb-3 text-xs text-slate-500">Distribution of indicator similarity tiers.</p>
+        <div className="h-72">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie data={bucketData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={95} label>
+                {bucketData.map((entry) => (
+                  <Cell key={entry.name} fill={entry.fill} />
+                ))}
+              </Pie>
+              <Tooltip />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </article>
+
       <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm lg:col-span-2">
         <h3 className="mb-2 font-semibold text-slate-800">High-Match Value Bars (&gt;=75%)</h3>
         <p className="mb-3 text-xs text-slate-500">Absolute value comparison for indicators that pass the match threshold.</p>
@@ -99,8 +130,8 @@ export default function ComparisonCharts({ leftName, rightName, validComparisons
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey={leftName} fill={COLORS.left} radius={[5, 5, 0, 0]} />
-                <Bar dataKey={rightName} fill={COLORS.right} radius={[5, 5, 0, 0]} />
+                <Bar name={`${leftFlag} ${leftName}`} dataKey={leftName} fill={COLORS.left} radius={[5, 5, 0, 0]} />
+                <Bar name={`${rightFlag} ${rightName}`} dataKey={rightName} fill={COLORS.right} radius={[5, 5, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
