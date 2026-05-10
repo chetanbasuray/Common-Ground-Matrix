@@ -57,8 +57,13 @@ function formatGapLabel(deltaPercent, direction) {
   return `${deltaPercent.toFixed(1)}% ${direction}`;
 }
 
-function buildPopulationProjection(series, horizonYear = 2100) {
-  if (!series.length) return { projection: [], latest: null, projected: null, growthRate: 0 };
+function buildPopulationProjection(series, fertilityLatest, horizonYear = 2100) {
+  if (!series.length) {
+    return {
+      scenarios: { baseline: [], fertilityAdjusted: [], stability: [] },
+      latest: null
+    };
+  }
 
   const latest = series[series.length - 1];
   const recent = series.slice(-11);
@@ -66,17 +71,23 @@ function buildPopulationProjection(series, horizonYear = 2100) {
   const years = Math.max(1, latest.year - start.year);
   const growthRate = start.value > 0 ? Math.pow(latest.value / start.value, 1 / years) - 1 : 0;
 
-  const projection = [];
+  const fertilityFactor = fertilityLatest && fertilityLatest > 0 ? Math.min(1.15, Math.max(0.45, fertilityLatest / 2.1)) : 1;
+  const adjustedGrowthRate = growthRate * fertilityFactor;
+
+  const baseline = [];
+  const fertilityAdjusted = [];
+  const stability = [];
   for (let year = latest.year + 1; year <= horizonYear; year += 1) {
-    const projectedValue = latest.value * Math.pow(1 + growthRate, year - latest.year);
-    projection.push({ year, value: projectedValue });
+    baseline.push({ year, value: latest.value * Math.pow(1 + growthRate, year - latest.year) });
+    fertilityAdjusted.push({ year, value: latest.value * Math.pow(1 + adjustedGrowthRate, year - latest.year) });
+    stability.push({ year, value: latest.value });
   }
 
   return {
-    projection,
+    scenarios: { baseline, fertilityAdjusted, stability },
     latest,
-    projected: projection[projection.length - 1] || latest,
-    growthRate
+    growthRate,
+    adjustedGrowthRate
   };
 }
 
@@ -262,6 +273,10 @@ export default async function Home({ searchParams }) {
   const [
     populationSeriesA,
     populationSeriesB,
+    populationGrowthSeriesA,
+    populationGrowthSeriesB,
+    fertilitySeriesA,
+    fertilitySeriesB,
     internetSeriesA,
     internetSeriesB,
     lifeSeriesA,
@@ -269,6 +284,10 @@ export default async function Home({ searchParams }) {
   ] = await Promise.all([
     getCountryIndicatorSeries(countryA, 'SP.POP.TOTL', 1990),
     getCountryIndicatorSeries(countryB, 'SP.POP.TOTL', 1990),
+    getCountryIndicatorSeries(countryA, 'SP.POP.GROW', 1990),
+    getCountryIndicatorSeries(countryB, 'SP.POP.GROW', 1990),
+    getCountryIndicatorSeries(countryA, 'SP.DYN.TFRT.IN', 1990),
+    getCountryIndicatorSeries(countryB, 'SP.DYN.TFRT.IN', 1990),
     getCountryIndicatorSeries(countryA, 'IT.NET.USER.ZS', 1990),
     getCountryIndicatorSeries(countryB, 'IT.NET.USER.ZS', 1990),
     getCountryIndicatorSeries(countryA, 'SP.DYN.LE00.IN', 1990),
@@ -282,24 +301,26 @@ export default async function Home({ searchParams }) {
     .sort((a, b) => b.closeness - a.closeness);
   const commonGroundScore = getCommonGroundScore(comparisons);
   const topMatches = getMostSimilar(matchedComparisons);
-  const popProjectionA = buildPopulationProjection(populationSeriesA, 2100);
-  const popProjectionB = buildPopulationProjection(populationSeriesB, 2100);
+  const fertilityLatestA = fertilitySeriesA[fertilitySeriesA.length - 1]?.value ?? null;
+  const fertilityLatestB = fertilitySeriesB[fertilitySeriesB.length - 1]?.value ?? null;
+  const popProjectionA = buildPopulationProjection(populationSeriesA, fertilityLatestA, 2100);
+  const popProjectionB = buildPopulationProjection(populationSeriesB, fertilityLatestB, 2100);
   const internetSimilarity = buildSimilarityTimeline(internetSeriesA, internetSeriesB);
   const lifeSimilarity = buildSimilarityTimeline(lifeSeriesA, lifeSeriesB);
   const trendSeries = {
-    population: {
-      history: mergeSeriesByYear(populationSeriesA, populationSeriesB, 'left', 'right'),
-      projectionA: popProjectionA.projection,
-      projectionB: popProjectionB.projection,
-      latestA: popProjectionA.latest,
-      latestB: popProjectionB.latest,
-      projectedA: popProjectionA.projected,
-      projectedB: popProjectionB.projected
-    },
-    internet: mergeSeriesByYear(internetSeriesA, internetSeriesB, 'left', 'right'),
-    similarity: {
-      internet: internetSimilarity,
-      lifeExpectancy: lifeSimilarity
+      population: {
+        history: mergeSeriesByYear(populationSeriesA, populationSeriesB, 'left', 'right'),
+        projectionA: popProjectionA.scenarios,
+        projectionB: popProjectionB.scenarios,
+        latestA: popProjectionA.latest,
+        latestB: popProjectionB.latest
+      },
+      internet: mergeSeriesByYear(internetSeriesA, internetSeriesB, 'left', 'right'),
+      lifeExpectancy: mergeSeriesByYear(lifeSeriesA, lifeSeriesB, 'left', 'right'),
+      populationGrowth: mergeSeriesByYear(populationGrowthSeriesA, populationGrowthSeriesB, 'left', 'right'),
+      similarity: {
+        internet: internetSimilarity,
+        lifeExpectancy: lifeSimilarity
     }
   };
 
