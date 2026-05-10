@@ -5,6 +5,7 @@ import {
   formatIndicatorValue,
   getCommonGroundScore,
   getCountries,
+  getCountryIndicatorSeries,
   getCountryIndicators,
   getMostSimilar
 } from '../lib/worldbank';
@@ -51,9 +52,56 @@ function isoToFlag(isoCode) {
     .join('');
 }
 
-function formatGapLabel(deltaPercent, leftName, rightName) {
-  if (deltaPercent < 1) return `Very similar (${leftName} and ${rightName})`;
-  return `${deltaPercent.toFixed(1)}% gap`;
+function formatGapLabel(deltaPercent, direction) {
+  if (deltaPercent < 1) return 'Very similar (<1% difference)';
+  return `${deltaPercent.toFixed(1)}% ${direction}`;
+}
+
+function buildPopulationProjection(series, horizonYear = 2100) {
+  if (!series.length) return { projection: [], latest: null, projected: null, growthRate: 0 };
+
+  const latest = series[series.length - 1];
+  const recent = series.slice(-11);
+  const start = recent[0];
+  const years = Math.max(1, latest.year - start.year);
+  const growthRate = start.value > 0 ? Math.pow(latest.value / start.value, 1 / years) - 1 : 0;
+
+  const projection = [];
+  for (let year = latest.year + 1; year <= horizonYear; year += 1) {
+    const projectedValue = latest.value * Math.pow(1 + growthRate, year - latest.year);
+    projection.push({ year, value: projectedValue });
+  }
+
+  return {
+    projection,
+    latest,
+    projected: projection[projection.length - 1] || latest,
+    growthRate
+  };
+}
+
+function mergeSeriesByYear(leftSeries, rightSeries, keyA, keyB) {
+  const byYear = new Map();
+  leftSeries.forEach((item) => {
+    byYear.set(item.year, { year: item.year, [keyA]: item.value });
+  });
+  rightSeries.forEach((item) => {
+    const existing = byYear.get(item.year) || { year: item.year };
+    existing[keyB] = item.value;
+    byYear.set(item.year, existing);
+  });
+  return [...byYear.values()].sort((a, b) => a.year - b.year);
+}
+
+function buildSimilarityTimeline(leftSeries, rightSeries) {
+  const merged = mergeSeriesByYear(leftSeries, rightSeries, 'left', 'right');
+  return merged
+    .filter((item) => item.left !== undefined && item.right !== undefined)
+    .map((item) => {
+      const max = Math.max(Math.abs(item.left), Math.abs(item.right), 1);
+      const closeness = Math.max(0, (1 - Math.abs(item.left - item.right) / max) * 100);
+      return { year: item.year, closeness: Number(closeness.toFixed(1)) };
+    });
 }
 
 function MirrorRow({ item, leftName, rightName, leftFlag, rightFlag }) {
@@ -116,7 +164,7 @@ function SimilarityLadder({ items }) {
   );
 }
 
-function DivergenceChart({ items, leftName, rightName }) {
+function DivergenceChart({ items, leftName, rightName, leftFlag, rightFlag }) {
   return (
     <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
       <div className="mb-3 flex items-center gap-2 text-slate-700">
@@ -130,13 +178,16 @@ function DivergenceChart({ items, leftName, rightName }) {
           const delta = ((item.valueA - item.valueB) / max) * 100;
           const rightLead = delta < 0;
           const width = Math.min(100, Math.abs(delta));
+          const leadName = rightLead ? rightName : leftName;
+          const leadFlag = rightLead ? rightFlag : leftFlag;
+          const direction = rightLead ? 'higher' : 'higher';
 
           return (
             <div key={item.key}>
               <div className="mb-1 flex items-center justify-between text-xs">
                 <span className="text-slate-700">{item.label}</span>
                 <span className="font-semibold text-slate-800">
-                  {rightLead ? rightName : leftName} {formatGapLabel(width, leftName, rightName)}
+                  {leadFlag} {leadName} {formatGapLabel(width, direction)}
                 </span>
               </div>
               <div className="relative h-3 rounded-full bg-slate-200">
@@ -165,23 +216,30 @@ function MatchDistribution({ validComparisons }) {
   const strongWidth = (buckets.strong / total) * 100;
   const fairWidth = (buckets.fair / total) * 100;
   const weakWidth = (buckets.weak / total) * 100;
+  const strongestBand = buckets.elite + buckets.strong;
+  const strongestShare = ((strongestBand / total) * 100).toFixed(0);
+  const ringStyle = {
+    background: `conic-gradient(#0f766e 0 ${eliteWidth}%, #06b6d4 ${eliteWidth}% ${eliteWidth + strongWidth}%, #f59e0b ${eliteWidth + strongWidth}% ${eliteWidth + strongWidth + fairWidth}%, #f43f5e ${eliteWidth + strongWidth + fairWidth}% 100%)`
+  };
 
   return (
     <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
       <h3 className="font-semibold text-slate-800">Match Distribution</h3>
       <p className="mt-1 text-xs text-slate-500">How similarities are distributed across all indicators.</p>
-      <div className="mt-3 h-4 overflow-hidden rounded-full bg-slate-200">
-        <div className="h-full bg-emerald-600" style={{ width: `${eliteWidth}%` }} />
-        <div className="h-full bg-emerald-400" style={{ width: `${strongWidth}%` }} />
-        <div className="h-full bg-amber-400" style={{ width: `${fairWidth}%` }} />
-        <div className="h-full bg-rose-300" style={{ width: `${weakWidth}%` }} />
+      <div className="mt-4 grid grid-cols-[auto_1fr] items-center gap-4">
+        <div className="relative h-20 w-20 rounded-full" style={ringStyle}>
+          <div className="absolute inset-2 flex items-center justify-center rounded-full bg-white text-xs font-semibold text-slate-700">
+            {strongestShare}%
+          </div>
+        </div>
+        <div className="space-y-1 text-xs text-slate-700">
+          <p className="flex items-center justify-between"><span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-teal-700" />90-100%</span><span>{buckets.elite}</span></p>
+          <p className="flex items-center justify-between"><span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-cyan-500" />80-89%</span><span>{buckets.strong}</span></p>
+          <p className="flex items-center justify-between"><span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" />75-79%</span><span>{buckets.fair}</span></p>
+          <p className="flex items-center justify-between"><span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-500" />&lt;75%</span><span>{buckets.weak}</span></p>
+        </div>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-700">
-        <p>90-100%: {buckets.elite}</p>
-        <p>80-89%: {buckets.strong}</p>
-        <p>75-79%: {buckets.fair}</p>
-        <p>&lt;75%: {buckets.weak}</p>
-      </div>
+      <p className="mt-3 text-xs text-slate-600">{strongestShare}% of indicators are in the strong/elite similarity bands.</p>
     </article>
   );
 }
@@ -201,6 +259,21 @@ export default async function Home({ searchParams }) {
     getCountryIndicators(countryA),
     getCountryIndicators(countryB)
   ]);
+  const [
+    populationSeriesA,
+    populationSeriesB,
+    internetSeriesA,
+    internetSeriesB,
+    lifeSeriesA,
+    lifeSeriesB
+  ] = await Promise.all([
+    getCountryIndicatorSeries(countryA, 'SP.POP.TOTL', 1990),
+    getCountryIndicatorSeries(countryB, 'SP.POP.TOTL', 1990),
+    getCountryIndicatorSeries(countryA, 'IT.NET.USER.ZS', 1990),
+    getCountryIndicatorSeries(countryB, 'IT.NET.USER.ZS', 1990),
+    getCountryIndicatorSeries(countryA, 'SP.DYN.LE00.IN', 1990),
+    getCountryIndicatorSeries(countryB, 'SP.DYN.LE00.IN', 1990)
+  ]);
 
   const comparisons = compareIndicators(aData, bData);
   const validComparisons = comparisons.filter((item) => item.closeness !== null);
@@ -209,6 +282,26 @@ export default async function Home({ searchParams }) {
     .sort((a, b) => b.closeness - a.closeness);
   const commonGroundScore = getCommonGroundScore(comparisons);
   const topMatches = getMostSimilar(matchedComparisons);
+  const popProjectionA = buildPopulationProjection(populationSeriesA, 2100);
+  const popProjectionB = buildPopulationProjection(populationSeriesB, 2100);
+  const internetSimilarity = buildSimilarityTimeline(internetSeriesA, internetSeriesB);
+  const lifeSimilarity = buildSimilarityTimeline(lifeSeriesA, lifeSeriesB);
+  const trendSeries = {
+    population: {
+      history: mergeSeriesByYear(populationSeriesA, populationSeriesB, 'left', 'right'),
+      projectionA: popProjectionA.projection,
+      projectionB: popProjectionB.projection,
+      latestA: popProjectionA.latest,
+      latestB: popProjectionB.latest,
+      projectedA: popProjectionA.projected,
+      projectedB: popProjectionB.projected
+    },
+    internet: mergeSeriesByYear(internetSeriesA, internetSeriesB, 'left', 'right'),
+    similarity: {
+      internet: internetSimilarity,
+      lifeExpectancy: lifeSimilarity
+    }
+  };
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 md:px-8">
@@ -266,6 +359,9 @@ export default async function Home({ searchParams }) {
             <span className="text-sm font-medium text-slate-500">/ 100</span>
           </h2>
           <p className="mt-2 text-sm text-slate-600">Average statistical closeness across available datasets.</p>
+          <p className="mt-2 text-xs text-slate-500">
+            Population now: {formatIndicatorValue(popProjectionA.latest?.value ?? null, 'people')} vs {formatIndicatorValue(popProjectionB.latest?.value ?? null, 'people')}
+          </p>
         </article>
 
         <article className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
@@ -288,7 +384,13 @@ export default async function Home({ searchParams }) {
       <section className="mt-8 grid gap-4 md:grid-cols-3">
         <MatchDistribution validComparisons={validComparisons} />
         <SimilarityLadder items={validComparisons.slice().sort((a, b) => b.closeness - a.closeness)} />
-        <DivergenceChart items={validComparisons} leftName={countryAName} rightName={countryBName} />
+        <DivergenceChart
+          items={validComparisons}
+          leftName={countryAName}
+          rightName={countryBName}
+          leftFlag={countryAFlag}
+          rightFlag={countryBFlag}
+        />
       </section>
 
       {validComparisons.length > 0 ? (
@@ -299,6 +401,7 @@ export default async function Home({ searchParams }) {
           rightFlag={countryBFlag}
           validComparisons={validComparisons}
           matchedComparisons={matchedComparisons}
+          trendSeries={trendSeries}
         />
       ) : null}
 
