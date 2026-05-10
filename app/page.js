@@ -1,5 +1,6 @@
 import { ArrowLeftRight, BarChart3, Globe2, Leaf, SignalHigh, SplitSquareVertical } from 'lucide-react';
 import ComparisonCharts from '../components/ComparisonCharts';
+import ThemeToggle from '../components/ThemeToggle';
 import {
   compareIndicators,
   formatIndicatorValue,
@@ -305,9 +306,12 @@ export default async function Home({ searchParams }) {
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 md:px-8">
       <section className="rounded-3xl border border-slate-200/70 bg-white/75 p-6 shadow-lg backdrop-blur md:p-10">
-        <div className="flex flex-wrap items-center gap-3">
-          <Globe2 className="text-pine" />
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">Common Ground Matrix</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Globe2 className="text-pine" />
+            <h1 className="text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">Common Ground Matrix</h1>
+          </div>
+          <ThemeToggle />
         </div>
         <p className="mt-3 max-w-3xl text-slate-600">
           Compare two countries and discover where their realities converge using live World Bank indicators, refreshed daily.
