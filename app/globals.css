@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-mist text-slate-800;
+  background-image:
+    radial-gradient(circle at 20% 15%, #dbe9f1 0%, transparent 40%),
+    radial-gradient(circle at 80% 10%, #e6ddd1 0%, transparent 35%),
+    linear-gradient(160deg, #f5f7f5 0%, #edf2ee 100%);
+  min-height: 100vh;
+}

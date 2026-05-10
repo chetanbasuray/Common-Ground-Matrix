@@ -1,0 +1,10 @@
+{
+  "root": true,
+  "extends": ["next/core-web-vitals"],
+  "plugins": ["security", "import"],
+  "rules": {
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "import/no-unresolved": "off",
+    "security/detect-object-injection": "off"
+  }
+}
